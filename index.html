@@ -542,15 +542,14 @@
 
 <script>
   // ── CONFIG ──────────────────────────────────────────────────────────────
-  // To use real data: get a FREE key at https://www.alphavantage.co/support/#api-key
-  // Then paste it below OR use the in-dashboard "Set API Key" banner.
-  const DEMO_KEY = 'demo'; // Alpha Vantage's official demo key (limited tickers)
+  const DEMO_KEY = 'demo';
   let API_KEY = localStorage.getItem('av_api_key') || DEMO_KEY;
   const BASE = 'https://www.alphavantage.co/query';
 
   let chartInstance = null;
   let allDailyData = [];
   let currentRange = 30;
+  const cache = {};
 
   // Show banner if using demo key
   if (API_KEY === DEMO_KEY) {
@@ -579,8 +578,17 @@
   }
 
   async function fetchStock() {
-    const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
-    if (!ticker) return;
+  const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+  if (!ticker) return;
+
+  // Return cached result instantly if available
+  if (cache[ticker]) {
+    renderQuote(ticker, cache[ticker].quote);
+    allDailyData = cache[ticker].series;
+    renderChart(allDailyData, currentRange);
+    renderTable(allDailyData);
+    return;
+  }
 
     // Highlight active tag
     document.querySelectorAll('.tag').forEach(t => {
@@ -624,6 +632,7 @@
         renderChart(allDailyData, currentRange);
         renderTable(allDailyData);
       }
+      cache[ticker] = { quote: q, series: allDailyData };
 
     } catch (err) {
       setStatus('Network error. Check your connection and try again.', 'error');
