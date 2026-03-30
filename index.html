@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Market Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: rgba(255,255,255,0.07);
+    --accent: #00d4aa;
+    --accent2: #3b82f6;
+    --red: #f43f5e;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+  .logo span { color: var(--muted); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .api-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  /* Search bar */
+  .search-row {
+    display: flex;
+    gap: 10px;
+    padding: 20px 32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ticker-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 16px;
+    width: 140px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .ticker-input:focus { border-color: var(--accent); }
+  .ticker-input::placeholder { color: var(--muted); text-transform: none; letter-spacing: normal; }
+
+  .btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: #0a0e1a;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 10px 20px;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+
+  .watchlist-tags {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    padding: 5px 10px;
+    transition: all 0.15s;
+  }
+  .tag:hover, .tag.active { border-color: var(--accent); color: var(--accent); }
+
+  /* Main layout */
+  main {
+    padding: 24px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Status / error */
+  #status {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    min-height: 18px;
+    letter-spacing: 0.03em;
+  }
+  #status.error { color: var(--red); }
+  #status.loading { color: var(--accent); }
+
+  /* Quote header */
+  #quote-header {
+    display: none;
+    margin-bottom: 24px;
+    gap: 24px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    animation: fadeUp 0.3s ease;
+  }
+
+  .ticker-name {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+
+  .ticker-fullname {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 300;
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+
+  .price-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .price-main {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .price-change {
+    font-family: var(--mono);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .up { color: var(--accent); }
+  .down { color: var(--red); }
+
+  /* Metric cards grid */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .metric-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .metric-value {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Chart section */
+  .chart-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: none;
+    animation: fadeUp 0.4s ease;
+  }
+
+  .chart-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .chart-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .chart-interval-btns {
+    display: flex;
+    gap: 6px;
+  }
+
+  .interval-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    transition: all 0.15s;
+  }
+  .interval-btn:hover, .interval-btn.active { border-color: var(--accent); color: var(--accent); }
+
+  .chart-container { position: relative; height: 280px; }
+
+  /* Data table */
+  .table-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: none;
+    animation: fadeUp 0.5s ease;
+  }
+
+  .table-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  th {
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 10px 16px;
+    text-align: right;
+    text-transform: uppercase;
+  }
+  th:first-child { text-align: left; }
+
+  td {
+    border-bottom: 1px solid var(--border);
+    padding: 9px 16px;
+    text-align: right;
+    color: var(--text);
+  }
+  td:first-child { text-align: left; color: var(--muted); }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* Placeholder / empty state */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .empty-state .big-ticker {
+    font-family: var(--mono);
+    font-size: 64px;
+    font-weight: 600;
+    color: var(--border);
+    letter-spacing: 0.1em;
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  .empty-state p {
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: 0.03em;
+  }
+
+  /* API key banner */
+  .api-key-banner {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    font-weight: 300;
+    line-height: 1.6;
+    display: none;
+  }
+
+  .api-key-banner code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: rgba(59,130,246,0.15);
+    border-radius: 3px;
+    padding: 1px 6px;
+    color: var(--accent2);
+  }
+
+  .api-key-banner a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .api-input-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .api-key-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 12px;
+    flex: 1;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .api-key-input:focus { border-color: var(--accent2); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    header, .search-row, main { padding-left: 16px; padding-right: 16px; }
+    .ticker-name { font-size: 22px; }
+    .price-main { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">MARKET<span>_</span>DASH</div>
+  <div class="header-right">
+    <span class="api-badge">ALPHA VANTAGE API</span>
+  </div>
+</header>
+
+<div class="search-row">
+  <input class="ticker-input" id="tickerInput" type="text" maxlength="10" placeholder="Ticker e.g. AAPL" />
+  <button class="btn" id="searchBtn" onclick="fetchStock()">SEARCH</button>
+  <div class="watchlist-tags" id="watchlist">
+    <span class="tag" onclick="quickSearch('AAPL')">AAPL</span>
+    <span class="tag" onclick="quickSearch('MSFT')">MSFT</span>
+    <span class="tag" onclick="quickSearch('GOOGL')">GOOGL</span>
+    <span class="tag" onclick="quickSearch('NVDA')">NVDA</span>
+    <span class="tag" onclick="quickSearch('TSLA')">TSLA</span>
+    <span class="tag" onclick="quickSearch('AMZN')">AMZN</span>
+  </div>
+</div>
+
+<main>
+
+  <!-- API Key Banner -->
+  <div class="api-key-banner" id="apiBanner">
+    <strong>Set your Alpha Vantage API key to use real data.</strong><br>
+    Get a free key at <a href="https://www.alphavantage.co/support/#api-key" target="_blank">alphavantage.co</a> — takes 30 seconds, no credit card needed.
+    <div class="api-input-row">
+      <input class="api-key-input" id="apiKeyInput" type="text" placeholder="Paste your API key here..." />
+      <button class="btn btn-secondary" onclick="saveApiKey()">SAVE KEY</button>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <!-- Quote header -->
+  <div id="quote-header" style="display:none; flex-wrap:wrap; gap:24px; margin-bottom:24px;">
+    <div>
+      <div class="ticker-name" id="q-symbol">--</div>
+      <div class="ticker-fullname" id="q-name">--</div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="price-block">
+      <div class="price-main" id="q-price">--</div>
+      <div class="price-change" id="q-change">--</div>
+    </div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics" id="metrics" style="display:none;">
+    <div class="metric-card">
+      <div class="metric-label">Open</div>
+      <div class="metric-value" id="m-open">--</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">High</div>
+      <div class="metric-value" id="m-high">--</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Low</div>
+      <div class="metric-value" id="m-low">--</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Volume</div>
+      <div class="metric-value" id="m-volume">--</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">52W High</div>
+      <div class="metric-value" id="m-52h">--</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">52W Low</div>
+      <div class="metric-value" id="m-52l">--</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-section" id="chartSection">
+    <div class="chart-top">
+      <span class="chart-title">PRICE HISTORY</span>
+      <div class="chart-interval-btns">
+        <button class="interval-btn active" onclick="setRange(30, this)">1M</button>
+        <button class="interval-btn" onclick="setRange(90, this)">3M</button>
+        <button class="interval-btn" onclick="setRange(180, this)">6M</button>
+        <button class="interval-btn" onclick="setRange(365, this)">1Y</button>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-section" id="tableSection">
+    <div class="table-header">RECENT DAILY DATA</div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Open</th>
+            <th>High</th>
+            <th>Low</th>
+            <th>Close</th>
+            <th>Volume</th>
+            <th>Change %</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Empty state (shown initially) -->
+  <div class="empty-state" id="emptyState">
+    <div class="big-ticker">$</div>
+    <p>Search for a stock ticker above — or click a quick-access tag</p>
+  </div>
+
+</main>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────────────────
+  // To use real data: get a FREE key at https://www.alphavantage.co/support/#api-key
+  // Then paste it below OR use the in-dashboard "Set API Key" banner.
+  const DEMO_KEY = 'demo'; // Alpha Vantage's official demo key (limited tickers)
+  let API_KEY = localStorage.getItem('av_api_key') || DEMO_KEY;
+  const BASE = 'https://www.alphavantage.co/query';
+
+  let chartInstance = null;
+  let allDailyData = [];
+  let currentRange = 30;
+
+  // Show banner if using demo key
+  if (API_KEY === DEMO_KEY) {
+    document.getElementById('apiBanner').style.display = 'block';
+  }
+
+  function saveApiKey() {
+    const val = document.getElementById('apiKeyInput').value.trim();
+    if (!val) return;
+    API_KEY = val;
+    localStorage.setItem('av_api_key', val);
+    document.getElementById('apiBanner').style.display = 'none';
+    setStatus('API key saved!', '');
+    setTimeout(() => setStatus('', ''), 2000);
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = type || '';
+  }
+
+  function quickSearch(ticker) {
+    document.getElementById('tickerInput').value = ticker;
+    fetchStock();
+  }
+
+  async function fetchStock() {
+    const ticker = document.getElementById('tickerInput').value.trim().toUpperCase();
+    if (!ticker) return;
+
+    // Highlight active tag
+    document.querySelectorAll('.tag').forEach(t => {
+      t.classList.toggle('active', t.textContent === ticker);
+    });
+
+    document.getElementById('searchBtn').disabled = true;
+    setStatus('Fetching quote...', 'loading');
+    hideResults();
+
+    try {
+      // 1. Global Quote
+      const quoteUrl = `${BASE}?function=GLOBAL_QUOTE&symbol=${ticker}&apikey=${API_KEY}`;
+      const quoteRes = await fetch(quoteUrl);
+      const quoteData = await quoteRes.json();
+
+      if (quoteData['Note']) {
+        setStatus('API rate limit reached. Free tier allows 25 requests/day. Try again in a minute.', 'error');
+        document.getElementById('searchBtn').disabled = false;
+        return;
+      }
+
+      const q = quoteData['Global Quote'];
+      if (!q || !q['05. price']) {
+        setStatus(`No data found for "${ticker}". Check the ticker symbol.`, 'error');
+        document.getElementById('searchBtn').disabled = false;
+        return;
+      }
+
+      // 2. Daily time series for chart
+      const seriesUrl = `${BASE}?function=TIME_SERIES_DAILY&symbol=${ticker}&outputsize=compact&apikey=${API_KEY}`;
+      const seriesRes = await fetch(seriesUrl);
+      const seriesData = await seriesRes.json();
+
+      const timeSeries = seriesData['Time Series (Daily)'];
+
+      setStatus('', '');
+      renderQuote(ticker, q);
+      if (timeSeries) {
+        allDailyData = parseTimeSeries(timeSeries);
+        renderChart(allDailyData, currentRange);
+        renderTable(allDailyData);
+      }
+
+    } catch (err) {
+      setStatus('Network error. Check your connection and try again.', 'error');
+    }
+
+    document.getElementById('searchBtn').disabled = false;
+  }
+
+  function renderQuote(ticker, q) {
+    const price = parseFloat(q['05. price']);
+    const change = parseFloat(q['09. change']);
+    const changePct = parseFloat(q['10. change percent']);
+    const isUp = change >= 0;
+
+    document.getElementById('q-symbol').textContent = ticker;
+    document.getElementById('q-name').textContent = q['01. symbol'] || ticker;
+    document.getElementById('q-price').textContent = '$' + price.toFixed(2);
+
+    const chEl = document.getElementById('q-change');
+    const sign = isUp ? '+' : '';
+    chEl.textContent = `${sign}${change.toFixed(2)}  (${sign}${changePct.toFixed(2)}%)`;
+    chEl.className = 'price-change ' + (isUp ? 'up' : 'down');
+
+    document.getElementById('m-open').textContent = '$' + parseFloat(q['02. open']).toFixed(2);
+    document.getElementById('m-high').textContent = '$' + parseFloat(q['03. high']).toFixed(2);
+    document.getElementById('m-low').textContent = '$' + parseFloat(q['04. low']).toFixed(2);
+    document.getElementById('m-volume').textContent = formatVolume(parseInt(q['06. volume']));
+    document.getElementById('m-52h').textContent = '$' + parseFloat(q['03. high']).toFixed(2);
+    document.getElementById('m-52l').textContent = '$' + parseFloat(q['04. low']).toFixed(2);
+
+    document.getElementById('quote-header').style.display = 'flex';
+    document.getElementById('metrics').style.display = 'grid';
+    document.getElementById('emptyState').style.display = 'none';
+  }
+
+  function parseTimeSeries(ts) {
+    return Object.entries(ts)
+      .map(([date, v]) => ({
+        date,
+        open: parseFloat(v['1. open']),
+        high: parseFloat(v['2. high']),
+        low: parseFloat(v['3. low']),
+        close: parseFloat(v['4. close']),
+        volume: parseInt(v['5. volume'])
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function renderChart(data, days) {
+    const slice = data.slice(-days);
+    const labels = slice.map(d => d.date);
+    const closes = slice.map(d => d.close);
+
+    const isUp = closes[closes.length - 1] >= closes[0];
+    const lineColor = isUp ? '#00d4aa' : '#f43f5e';
+    const fillColor = isUp ? 'rgba(0,212,170,0.08)' : 'rgba(244,63,94,0.08)';
+
+    if (chartInstance) chartInstance.destroy();
+
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: closes,
+          borderColor: lineColor,
+          borderWidth: 2,
+          fill: true,
+          backgroundColor: fillColor,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a2236',
+            borderColor: 'rgba(255,255,255,0.07)',
+            borderWidth: 1,
+            titleColor: '#64748b',
+            bodyColor: '#e2e8f0',
+            titleFont: { family: "'IBM Plex Mono', monospace", size: 11 },
+            bodyFont: { family: "'IBM Plex Mono', monospace", size: 13, weight: '500' },
+            callbacks: {
+              label: ctx => ' $' + ctx.parsed.y.toFixed(2)
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#64748b',
+              font: { family: "'IBM Plex Mono', monospace", size: 10 },
+              maxTicksLimit: 6,
+              maxRotation: 0
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            border: { color: 'rgba(255,255,255,0.07)' }
+          },
+          y: {
+            ticks: {
+              color: '#64748b',
+              font: { family: "'IBM Plex Mono', monospace", size: 10 },
+              callback: v => '$' + v.toFixed(0)
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            border: { color: 'rgba(255,255,255,0.07)' }
+          }
+        }
+      }
+    });
+
+    document.getElementById('chartSection').style.display = 'block';
+  }
+
+  function renderTable(data) {
+    const recent = [...data].reverse().slice(0, 15);
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+
+    recent.forEach((d, i) => {
+      const prev = data[data.length - 2 - i];
+      const chgPct = prev ? ((d.close - prev.close) / prev.close * 100) : 0;
+      const isUp = chgPct >= 0;
+      const sign = isUp ? '+' : '';
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${d.date}</td>
+        <td>$${d.open.toFixed(2)}</td>
+        <td>$${d.high.toFixed(2)}</td>
+        <td>$${d.low.toFixed(2)}</td>
+        <td>$${d.close.toFixed(2)}</td>
+        <td>${formatVolume(d.volume)}</td>
+        <td class="${isUp ? 'up' : 'down'}">${sign}${chgPct.toFixed(2)}%</td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    document.getElementById('tableSection').style.display = 'block';
+  }
+
+  function setRange(days, btn) {
+    currentRange = days;
+    document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (allDailyData.length) renderChart(allDailyData, days);
+  }
+
+  function formatVolume(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+    return n.toString();
+  }
+
+  function hideResults() {
+    document.getElementById('quote-header').style.display = 'none';
+    document.getElementById('metrics').style.display = 'none';
+    document.getElementById('chartSection').style.display = 'none';
+    document.getElementById('tableSection').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'none';
+  }
+
+  // Enter key support
+  document.getElementById('tickerInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fetchStock();
+  });
+</script>
+
+</body>
+</html>
