@@ -620,6 +620,7 @@
 
       // 2. Daily time series for chart
       const seriesUrl = `${BASE}?function=TIME_SERIES_DAILY&symbol=${ticker}&outputsize=compact&apikey=${API_KEY}`;
+      await new Promise(resolve => setTimeout(resolve, 1200));
       const seriesRes = await fetch(seriesUrl);
       const seriesData = await seriesRes.json();
 
